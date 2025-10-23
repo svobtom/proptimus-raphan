@@ -71,6 +71,19 @@ For testing purposes, you can compare the optimized structure with the reference
 $  diff examples/P0DL07_optimised.pdb P0DL07_test/optimised_PDB/P0DL07_optimised.pdb
 ```
 
+## Running the calculation in the Docker container
+```bash
+# create folder for the results
+mkdir results
+
+# run computation
+docker run --rm --name proptimus \
+  -v ./examples:/opt/proptimus/examples \
+  -v ./results:/opt/proptimus/results \
+  local/proptimus \
+  raphan.py --PDB_file examples/P0DL07.pdb --data_dir results/P0DL07
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/sb-ncbr/rings-conformation-validation/blob/main/LICENSE) file for details.
