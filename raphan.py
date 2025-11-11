@@ -99,6 +99,7 @@ class Substructure_data:
 
 def optimise_substructure(substructure_data,
                           iteration,
+                          convergence_criterion,
                           phase):
 
     if phase == "optimisation":
@@ -273,7 +274,7 @@ def optimise_substructure(substructure_data,
         for x in range(1, 3):
             diffs = [dist(a,b) for a,b in zip([x[1] for x in optimised_coordinates], substructure_data.archive[-x])]
             max_diffs.append(max(diffs))
-        if any([x<0.01 for x in max_diffs]):
+        if any([x<convergence_criterion for x in max_diffs]):
             raphan_converged = True
     return optimised_coordinates, raphan_converged, substructure_data
 
@@ -293,14 +294,14 @@ class Raphan:
         self._load_molecule()
 
         self.optimised_coordinates = [atom.coord for atom in self.structure.get_atoms()]
-        bar = tqdm.tqdm(total=100,
+        bar = tqdm.tqdm(total=150,
                         desc="Structure optimisation",
                         unit=" iteration")
         with Pool(self.cpu) as pool:
             # optimisation
             for iteration in range(1, 50):
                 bar.update(1)
-                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "optimisation") for substructure in self.substructures_data if not substructure.converged])
+                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, 0.01, "optimisation") for substructure in self.substructures_data if not substructure.converged])
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None:  # xtb did not converge
                         continue
@@ -317,9 +318,9 @@ class Raphan:
             # final refinement
             for substructure_data in self.substructures_data:
                 substructure_data.converged = False
-            for iteration in range(iteration+1, iteration+51):
+            for iteration in range(iteration+1, iteration + 101):
                 bar.update(1)
-                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "final refinement") for substructure in self.substructures_data if not substructure.converged])
+                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, 0.002, "final refinement") for substructure in self.substructures_data if not substructure.converged])
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None: # xtb did not converge
                         continue
@@ -331,7 +332,7 @@ class Raphan:
                     atom.coord = coord
                 self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised_{iteration}.pdb")
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
-                    bar.update(100 - iteration)
+                    bar.update(150 - iteration)
                     bar.refresh()
                     break
             bar.close()
