@@ -64,15 +64,18 @@ Please note that the resulting structures may vary slightly. This is due to nume
 
 ## Running the calculation in the Docker container
 ```bash
-# create folder for the results
+# Build Docker container
+docker build - t local/proptimus .
+
+# Create folder for the results
 mkdir results
 
-# run computation
+# Run the computation
 docker run --rm --name proptimus \
   -v ./examples:/opt/proptimus/examples \
   -v ./results:/opt/proptimus/results \
   local/proptimus \
-  raphan.py --PDB_file examples/P0DL07.pdb --data_dir results/P0DL07
+  python raphan.py --PDB_file examples/P0DL07.pdb --data_dir results/P0DL07
 ```
 
 ## License
