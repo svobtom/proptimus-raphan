@@ -67,13 +67,13 @@ class AtomSelector(Select):
 
 class Substructure_data:
     def __init__(self,
-                 atoms_30A,
+                 atoms_35A,
                  data_dir,
                  optimised_residue,
                  optimised_residue_index,
                  structure,
                  io):
-        self.atoms_30A = atoms_30A
+        self.atoms_35A = atoms_35A
         self.data_dir = data_dir
         self.optimised_residue_index = optimised_residue_index
         self.optimised_residue = optimised_residue
@@ -99,27 +99,30 @@ class Substructure_data:
 
 def optimise_substructure(substructure_data,
                           iteration,
-                          convergence_criterion,
                           phase):
 
     if phase == "optimisation":
         optimised_atoms = substructure_data.optimised_atoms
         minimum_radius = 6
+        flexible_radius = 4
+        maximum_radius = 12
     elif phase == "final refinement":
         optimised_atoms = substructure_data.final_optimised_atoms
         minimum_radius = 8
+        flexible_radius = 6
+        maximum_radius = 14
 
     # find effective neighbourhood
-    kdtree = NeighborSearch(substructure_data.atoms_30A)
+    kdtree = NeighborSearch(substructure_data.atoms_35A)
     atoms_in_minimum_radius = []
-    atoms_in_12A = []
+    atoms_in_maximum_radius = []
     for optimised_residue_atom in optimised_atoms:
         atoms_in_minimum_radius.extend(kdtree.search(center=optimised_residue_atom.coord,
-                                         radius=minimum_radius,
-                                         level="A"))
-        atoms_in_12A.extend(kdtree.search(center=optimised_residue_atom.coord,
-                                         radius=12,
-                                         level="A"))
+                                                     radius=minimum_radius,
+                                                     level="A"))
+        atoms_in_maximum_radius.extend(kdtree.search(center=optimised_residue_atom.coord,
+                                                     radius=maximum_radius,
+                                                     level="A"))
 
     # create pdb files to can load them with RDKit
     selector = AtomSelector()
@@ -128,9 +131,9 @@ def optimise_substructure(substructure_data,
     substructure_data.io.save(file=f"{substructure_data.data_dir}/atoms_in_minimum_radius.pdb",
                               select=selector,
                               preserve_atom_numbering=True)
-    selector.full_ids = set([atom.full_id for atom in atoms_in_12A])
-    selector.res_full_ids = set([atom.get_parent().full_id for atom in atoms_in_12A])
-    substructure_data.io.save(file=f"{substructure_data.data_dir}/atoms_in_12A.pdb",
+    selector.full_ids = set([atom.full_id for atom in atoms_in_maximum_radius])
+    selector.res_full_ids = set([atom.get_parent().full_id for atom in atoms_in_maximum_radius])
+    substructure_data.io.save(file=f"{substructure_data.data_dir}/atoms_in_maximum_radius.pdb",
                               select=selector,
                               preserve_atom_numbering=True)
 
@@ -139,7 +142,7 @@ def optimise_substructure(substructure_data,
                                          removeHs=False,
                                          sanitize=False)
     mol_min_radius_conformer = mol_min_radius.GetConformer()
-    mol_max_radius = Chem.MolFromPDBFile(pdbFileName=f"{substructure_data.data_dir}/atoms_in_12A.pdb",
+    mol_max_radius = Chem.MolFromPDBFile(pdbFileName=f"{substructure_data.data_dir}/atoms_in_maximum_radius.pdb",
                                          removeHs=False,
                                          sanitize=False)
     mol_max_radius_conformer = mol_max_radius.GetConformer()
@@ -207,7 +210,7 @@ def optimise_substructure(substructure_data,
             atom.mode = "constrained"
         elif atom in optimised_atoms:
             atom.mode = "optimised"
-        elif any(dist(atom.coord, ra.coord) < 4 for ra in optimised_atoms):
+        elif any(dist(atom.coord, ra.coord) < flexible_radius for ra in optimised_atoms):
             atom.mode = "flexible"
         else:
             atom.mode = "constrained"
@@ -274,7 +277,7 @@ def optimise_substructure(substructure_data,
         for x in range(1, 3):
             diffs = [dist(a,b) for a,b in zip([x[1] for x in optimised_coordinates], substructure_data.archive[-x])]
             max_diffs.append(max(diffs))
-        if any([x<convergence_criterion for x in max_diffs]):
+        if any([x<0.01 for x in max_diffs]):
             raphan_converged = True
     return optimised_coordinates, raphan_converged, substructure_data
 
@@ -294,14 +297,14 @@ class Raphan:
         self._load_molecule()
 
         self.optimised_coordinates = [atom.coord for atom in self.structure.get_atoms()]
-        bar = tqdm.tqdm(total=150,
+        bar = tqdm.tqdm(total=100,
                         desc="Structure optimisation",
                         unit=" iteration")
         with Pool(self.cpu) as pool:
             # optimisation
             for iteration in range(1, 50):
                 bar.update(1)
-                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, 0.01, "optimisation") for substructure in self.substructures_data if not substructure.converged])
+                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "optimisation") for substructure in self.substructures_data if not substructure.converged])
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None:  # xtb did not converge
                         continue
@@ -318,9 +321,9 @@ class Raphan:
             # final refinement
             for substructure_data in self.substructures_data:
                 substructure_data.converged = False
-            for iteration in range(iteration+1, iteration + 101):
+            for iteration in range(iteration+1, iteration + 51):
                 bar.update(1)
-                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, 0.002, "final refinement") for substructure in self.substructures_data if not substructure.converged])
+                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "final refinement") for substructure in self.substructures_data if not substructure.converged])
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None: # xtb did not converge
                         continue
@@ -332,7 +335,7 @@ class Raphan:
                     atom.coord = coord
                 self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised_{iteration}.pdb")
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
-                    bar.update(150 - iteration)
+                    bar.update(100 - iteration)
                     bar.refresh()
                     break
             bar.close()
@@ -371,10 +374,10 @@ class Raphan:
         self.substructures_data = []
         kdtree = NeighborSearch(list(self.structure.get_atoms()))
         for residue_index, residue in enumerate(self.structure.get_residues(), start=1):
-            atoms_30A = kdtree.search(center=residue.center_of_mass(geometric=True),
-                                      radius=30, # radius of AMK (6A) + outer substructure radius (12A) + maximum shift of atom (10A) + extra (2A)
+            atoms_35A = kdtree.search(center=residue.center_of_mass(geometric=True),
+                                      radius=35, # radius of AMK (6A) + outer substructure radius (14A) + maximum shift of atom (10A) + extra (5A)
                                       level="A")
-            self.substructures_data.append(Substructure_data(atoms_30A=atoms_30A,
+            self.substructures_data.append(Substructure_data(atoms_35A=atoms_35A,
                                                              data_dir=f"{self.data_dir}/sub_{residue_index}",
                                                              optimised_residue=residue,
                                                              optimised_residue_index=residue_index,
