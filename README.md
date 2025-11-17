@@ -65,7 +65,7 @@ Please note that the resulting structures may vary slightly. This is due to nume
 ## Running the calculation in the Docker container
 ```bash
 # Build Docker container
-docker build - t local/proptimus .
+docker build -t local/proptimus .
 
 # Create folder for the results
 mkdir results
