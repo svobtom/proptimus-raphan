@@ -21,7 +21,7 @@ git clone https://github.com/sb-ncbr/proptimus_raphan
 
 **3. Set up virtual environment**
 
-* Create a virtual environment named `proptimus_raphan_env`:
+* Create a virtual environment named `proptimus-raphan`:
 
 ```
 conda env create -f proptimus_raphan/environment.yml
@@ -30,7 +30,7 @@ conda env create -f proptimus_raphan/environment.yml
 * Activate the virtual environment:
 
 ```
-conda activate proptimus_raphan_env
+conda activate proptimus-raphan
 ```
 
 ## Executing the calculation
@@ -52,8 +52,7 @@ conda activate proptimus_raphan_env
 ### Example of executing the calculation:
 
 ```bash
-cd proptimus_raphan
-python raphan.py --PDB_file examples/P0DL07.pdb --data_dir P0DL07_test
+raphan --PDB_file examples/P0DL07.pdb --data_dir P0DL07_test
 ```
 For testing purposes, you can compare the optimised structure with the reference:
 
