@@ -1,4 +1,4 @@
-name: proptimus_raphan_env
+name: proptimus-raphan
 channels:
   - defaults
   - conda-forge
@@ -198,4 +198,5 @@ dependencies:
   - zlib=1.3.1=hb9d3cd8_2
   - zstandard=0.23.0=py313h2c38b39_1
   - zstd=1.5.6=ha6fb4c9_0
-prefix: /home/user/miniconda3
+  - pip:
+    - -e .

@@ -67,13 +67,13 @@ class AtomSelector(Select):
 
 class Substructure_data:
     def __init__(self,
-                 atoms_35A,
+                 atoms_30A,
                  data_dir,
                  optimised_residue,
                  optimised_residue_index,
                  structure,
                  io):
-        self.atoms_35A = atoms_35A
+        self.atoms_30A = atoms_30A
         self.data_dir = data_dir
         self.optimised_residue_index = optimised_residue_index
         self.optimised_residue = optimised_residue
@@ -109,11 +109,11 @@ def optimise_substructure(substructure_data,
     elif phase == "final refinement":
         optimised_atoms = substructure_data.final_optimised_atoms
         minimum_radius = 8
-        flexible_radius = 6
-        maximum_radius = 14
+        flexible_radius = 4
+        maximum_radius = 12
 
     # find effective neighbourhood
-    kdtree = NeighborSearch(substructure_data.atoms_35A)
+    kdtree = NeighborSearch(substructure_data.atoms_30A)
     atoms_in_minimum_radius = []
     atoms_in_maximum_radius = []
     for optimised_residue_atom in optimised_atoms:
@@ -374,10 +374,10 @@ class Raphan:
         self.substructures_data = []
         kdtree = NeighborSearch(list(self.structure.get_atoms()))
         for residue_index, residue in enumerate(self.structure.get_residues(), start=1):
-            atoms_35A = kdtree.search(center=residue.center_of_mass(geometric=True),
-                                      radius=35, # radius of AMK (6A) + outer substructure radius (14A) + maximum shift of atom (10A) + extra (5A)
+            atoms_30A = kdtree.search(center=residue.center_of_mass(geometric=True),
+                                      radius=30, # radius of AMK (6A) + outer substructure radius (12A) + maximum shift of atom (10A) + extra (2A)
                                       level="A")
-            self.substructures_data.append(Substructure_data(atoms_35A=atoms_35A,
+            self.substructures_data.append(Substructure_data(atoms_30A=atoms_30A,
                                                              data_dir=f"{self.data_dir}/sub_{residue_index}",
                                                              optimised_residue=residue,
                                                              optimised_residue_index=residue_index,
@@ -485,7 +485,7 @@ def run_constrained_alpha_optimisations(raphan):
     print("ok")
 
 
-if __name__ == '__main__':
+def main():
     args = load_arguments()
     t = time()
     raphan = Raphan(args.data_dir, args.PDB_file, args.cpu, args.delete_auxiliary_files)
@@ -496,3 +496,8 @@ if __name__ == '__main__':
     if args.constrained_alpha_carbons_optimisations:
         run_constrained_alpha_optimisations(raphan)
     print("")
+
+
+if __name__ == '__main__':
+    main()
+
