@@ -19,7 +19,7 @@ bash Miniconda3-latest-Linux-x86_64.sh
 git clone https://github.com/sb-ncbr/proptimus_raphan
 ```
 
-**3. Set up virtual environment**
+**3. Set up a virtual environment**
 
 * Create a virtual environment named `proptimus-raphan`:
 
@@ -60,6 +60,9 @@ For testing purposes, you can compare the optimised structure with the reference
 diff examples/P0DL07_optimised.pdb P0DL07_test/optimised_PDB/P0DL07_optimised.pdb
 ```
 Please note that the resulting structures may vary slightly. This is due to numerical instabilities caused by running on different hardware.
+
+## Reproduction of test results from the publication about PROPTIMUS RAPHAN
+The comparison_scripts directory contains several Python scripts for reproducing the results from the publication. To run the scripts, you need to download and unzip the calculation.zip file from [supplementary files](https://onedata.e-infra.cz/ozw/onezone/i#/public/shares/baa17140ec395e18bd97e089d1c7b683ch7f7a).
 
 ## License
 
