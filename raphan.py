@@ -411,7 +411,7 @@ class Raphan:
 
 
 def run_constrained_alpha_optimisations(raphan):
-    print("Running constrained alpha optimisation... ", end="", flush=True)
+    print("Running constrained alpha carbons optimisation... ", end="", flush=True)
 
     # find alpha_carbons_indices to constrain them
     alpha_carbons_indices = []
