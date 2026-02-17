@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tqdm
 from Bio import SeqUtils
-from Bio.PDB import Select, PDBIO, PDBParser, Superimposer, NeighborSearch
+from Bio.PDB import Select, PDBIO, PDBParser, Superimposer, NeighborSearch, Structure
 from math import dist
 from multiprocessing import Pool, Array
 from pathlib import Path
@@ -313,6 +313,13 @@ class Raphan:
                         continue
                     self.substructures_data[substructure_data.optimised_residue_index - 1].archive.append(optimised_coordinates)
                     self.substructures_data[substructure_data.optimised_residue_index - 1].converged = convergence
+                for i, atom in enumerate(self.structure.get_atoms()):
+                    atom.coord = coordinates[i*3:i*3+3]
+                step = self.structure[0].copy()
+                step.id = iteration
+                step.serial_num = iteration+1
+                self.trajectory.add(step)
+                self.io.save(str(self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised_{iteration}.pdb"))
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
                     break
 
@@ -328,6 +335,12 @@ class Raphan:
                         continue
                     self.substructures_data[substructure_data.optimised_residue_index - 1].archive.append(optimised_coordinates)
                     self.substructures_data[substructure_data.optimised_residue_index - 1].converged = convergence
+                for i, atom in enumerate(self.structure.get_atoms()):
+                    atom.coord = coordinates[i*3:i*3+3]
+                step = self.structure[0].copy()
+                step.id = iteration
+                step.serial_num = iteration+1
+                self.trajectory.add(step)
                 self.io.save(str(self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised_{iteration}.pdb"))
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
                     bar.update(100 - iteration)
@@ -345,12 +358,16 @@ class Raphan:
         for atom in self.structure.get_atoms():
             atom.coord = coordinates[(atom.serial_number - 1) * 3:(atom.serial_number - 1) * 3 + 3]
         self.io.save(str(self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised.pdb"))
+        self.io.set_structure(self.trajectory)
+        self.io.save(str(self.data_dir / "optimised_PDB" / "trajectory.pdb"))
         print("ok")
 
         if self.delete_auxiliary_files:
             print("Deleting auxiliary files...", end="")
             final_pdb = self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised.pdb"
             final_pdb.replace(self.data_dir / final_pdb.name)
+            trajectory = self.data_dir / "optimised_PDB" / "trajectory.pdb"
+            trajectory.replace(self.data_dir / trajectory.name)
             for p in self.data_dir.iterdir():
                 if p.is_dir() and (p.name.startswith("sub_") or p.name in ["optimised_PDB", "input_PDB"]):
                     shutil.rmtree(p)
@@ -366,6 +383,7 @@ class Raphan:
             io.set_structure(structure)
             self.io = io
             self.structure = io.structure
+            self.trajectory = Structure.Structure("MultiModel")
         except KeyError:
             exit(f"\nERROR! PDB file {self.PDB_file} does not contain any structure or file is corrupted.\n")
 
@@ -401,7 +419,7 @@ class Raphan:
                         optimised_atoms.add(atom.serial_number)
             for atom in ["N", "H"]:  # add atoms from following bonded residue to optimise whole peptide bond
                 try:
-                    optimised_atoms.add(structure[0]["A"][residue.id[1] + 1][atom].serial_number)
+                    optimised_atoms.add(structure[0][residue.get_parent().id][residue.id[1] + 1][atom].serial_number)
                 except KeyError:  # because of last residue
                     break
             self.substructures_data.append(Substructure_data(data_dir=self.data_dir / f"sub_{residue_index}",
