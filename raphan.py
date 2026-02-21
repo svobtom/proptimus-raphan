@@ -8,7 +8,7 @@ import tqdm
 from Bio import SeqUtils
 from Bio.PDB import Select, PDBIO, PDBParser, Superimposer, NeighborSearch, Structure
 from math import dist
-from multiprocessing import Pool, Array
+from multiprocessing import Pool, RawArray
 from pathlib import Path
 from rdkit import Chem
 from time import time
@@ -79,6 +79,12 @@ class Substructure_data:
         self.converged = False
         self.optimised_atoms = optimised_atoms
         self.final_optimised_atoms = final_optimised_atoms
+
+
+def init_worker(coordinates_param, updated_coordinates_param):
+    global coordinates, updated_coordinates
+    coordinates = coordinates_param
+    updated_coordinates = updated_coordinates_param
 
 
 def optimise_substructure(substructure_data,
@@ -198,7 +204,7 @@ def optimise_substructure(substructure_data,
     rigid_atoms_indices = []
     for i, atom in enumerate(substructure.get_atoms(),
                              start=1):
-        if atom.name == "CA":
+        if atom.name == "CA" and atom.element == "C" and not atom.get_parent().full_id[0].startswith("H_"):
             atom.mode = "constrained"
         elif atom in optimised_atoms:
             atom.mode = "optimised"
@@ -218,13 +224,16 @@ def optimise_substructure(substructure_data,
                 rigid_atoms_indices.append(i)
 
     # prepare xtb settings file
+    max_cycle = len(optimised_atoms_indices) + iteration
+    if max_cycle < 5:
+        max_cycle = 5
     xtb_settings_template = f"""$constrain
     atoms: xxx
     force constant=10.0
     $end
     $opt
-    maxcycle={len(optimised_atoms_indices) + iteration}
-    microcycle={len(optimised_atoms_indices) + iteration + 1}
+    maxcycle={max_cycle}
+    microcycle={max_cycle + 1}
     $end
     """
     substructure_settings = xtb_settings_template.replace("xxx", ", ".join([str(i) for i in constrained_atoms_indices]))
@@ -266,9 +275,9 @@ def optimise_substructure(substructure_data,
     for optimised_atom_index in optimised_atoms_indices:
         optimised_atom_coord = optimised_substructure_atoms[optimised_atom_index - 1].coord
         original_atom_index = substructure_atoms[optimised_atom_index - 1].serial_number - 1
-        coordinates[original_atom_index * 3] = optimised_atom_coord[0]
-        coordinates[original_atom_index * 3 + 1] = optimised_atom_coord[1]
-        coordinates[original_atom_index * 3 + 2] = optimised_atom_coord[2]
+        updated_coordinates[original_atom_index * 3] = optimised_atom_coord[0]
+        updated_coordinates[original_atom_index * 3 + 1] = optimised_atom_coord[1]
+        updated_coordinates[original_atom_index * 3 + 2] = optimised_atom_coord[2]
         optimised_coordinates.append(optimised_atom_coord)
 
     # check raphan convergence
@@ -280,7 +289,8 @@ def optimise_substructure(substructure_data,
             max_diffs.append(max(diffs))
         if any([x < 0.01 for x in max_diffs]):
             raphan_converged = True
-    return optimised_coordinates, raphan_converged, substructure_data  # místo substructure_data vracet jen optimised_residue_index, raphan_converged dát taky do array
+
+    return optimised_coordinates, raphan_converged, substructure_data
 
 
 class Raphan:
@@ -297,17 +307,20 @@ class Raphan:
     def optimise(self):
         self._load_molecule()
 
-        global coordinates
-        coordinates = Array("d", [coord for atom in self.structure.get_atoms() for coord in atom.coord], lock=False)
+        coordinates = RawArray("d", [coord for atom in self.structure.get_atoms() for coord in atom.coord])
+        updated_coordinates = RawArray("d", [coord for atom in self.structure.get_atoms() for coord in atom.coord])
         bar = tqdm.tqdm(total=100,
                         desc="Structure optimisation",
                         unit=" iteration")
-        with Pool(self.cpu) as pool:
+        with Pool(processes=self.cpu,
+                  initializer=init_worker,
+                  initargs=(coordinates, updated_coordinates)) as pool:
             # optimisation
             for iteration in range(1, 50):
                 bar.update(1)
                 nonconverged_substructures = [(substructure, iteration, "optimisation") for substructure in self.substructures_data if not substructure.converged]
                 iteration_results = pool.starmap(optimise_substructure, nonconverged_substructures, chunksize=((len(nonconverged_substructures) - 1) // self.cpu) + 1)
+                coordinates[:] = updated_coordinates[:]
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None and convergence is None and substructure_data is None:  # xtb did not converge
                         continue
@@ -316,10 +329,9 @@ class Raphan:
                 for i, atom in enumerate(self.structure.get_atoms()):
                     atom.coord = coordinates[i*3:i*3+3]
                 step = self.structure[0].copy()
-                step.id = iteration
-                step.serial_num = iteration+1
+                step.id = iteration+1
+                step.serial_num = iteration+2
                 self.trajectory.add(step)
-                self.io.save(str(self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised_{iteration}.pdb"))
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
                     break
 
@@ -330,6 +342,7 @@ class Raphan:
                 bar.update(1)
                 nonconverged_substructures = [(substructure, iteration, "final refinement") for substructure in self.substructures_data if not substructure.converged]
                 iteration_results = pool.starmap(optimise_substructure, nonconverged_substructures, chunksize=((len(nonconverged_substructures) - 1) // self.cpu) + 1)
+                coordinates[:] = updated_coordinates[:]
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None and convergence is None and substructure_data is None:  # xtb did not converge
                         continue
@@ -338,10 +351,9 @@ class Raphan:
                 for i, atom in enumerate(self.structure.get_atoms()):
                     atom.coord = coordinates[i*3:i*3+3]
                 step = self.structure[0].copy()
-                step.id = iteration
-                step.serial_num = iteration+1
+                step.id = iteration+1
+                step.serial_num = iteration+2
                 self.trajectory.add(step)
-                self.io.save(str(self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised_{iteration}.pdb"))
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
                     bar.update(100 - iteration)
                     bar.refresh()
@@ -378,12 +390,18 @@ class Raphan:
 
         # open PDB file by Biopython
         try:
-            structure = PDBParser(QUIET=True).get_structure("structure", self.PDB_file)
+            structure = PDBParser(QUIET=True).get_structure("structure", self.PDB_file)[0]
+            for i, atom in enumerate(structure.get_atoms(), start=1):
+                atom.serial_number = i
             io = PDBIO()
             io.set_structure(structure)
             self.io = io
             self.structure = io.structure
             self.trajectory = Structure.Structure("MultiModel")
+            start = self.structure[0].copy()
+            start.id = 1
+            start.serial_num = 2
+            self.trajectory.add(start)
         except KeyError:
             exit(f"\nERROR! PDB file {self.PDB_file} does not contain any structure or file is corrupted.\n")
 
@@ -411,17 +429,21 @@ class Raphan:
                          preserve_atom_numbering=True)
 
             optimised_atoms = set()
-            for atom in residue:
-                if atom.get_parent().id[1] == 1:  # in first residue optimise also -NH3 function group
-                    optimised_atoms.add(atom.serial_number)
-                else:
-                    if atom.name not in ["N", "H"]:
+            if residue.id[0] == " ":  # standard residue
+                for atom in residue:
+                    if residue == list(residue.get_parent().get_residues())[0]:  # in first residue optimise also -NH3 function group
                         optimised_atoms.add(atom.serial_number)
-            for atom in ["N", "H"]:  # add atoms from following bonded residue to optimise whole peptide bond
-                try:
-                    optimised_atoms.add(structure[0][residue.get_parent().id][residue.id[1] + 1][atom].serial_number)
-                except KeyError:  # because of last residue
-                    break
+                    else:
+                        if atom.name not in ["N", "H"]:
+                            optimised_atoms.add(atom.serial_number)
+                for atom in ["N", "H"]:  # add atoms from following bonded residue to optimise whole peptide bond
+                    try:
+                        optimised_atoms.add(structure[residue.get_parent().id][residue.id[1] + 1][atom].serial_number)
+                    except KeyError:  # because of last residue
+                        break
+            else:  # heteroresidue
+                for atom in residue:
+                    optimised_atoms.add(atom.serial_number)
             self.substructures_data.append(Substructure_data(data_dir=self.data_dir / f"sub_{residue_index}",
                                                              optimised_residue_index=residue_index,
                                                              optimised_atoms=optimised_atoms,
