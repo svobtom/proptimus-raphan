@@ -388,29 +388,33 @@ class Raphan:
     def _load_molecule(self):
         print(f"Loading of structure from {self.PDB_file}... ", end="", flush=True)
 
-        # open PDB file by Biopython
-        try:
-            structure = PDBParser(QUIET=True).get_structure("structure", self.PDB_file)[0]
-            for i, atom in enumerate(structure.get_atoms(), start=1):
-                atom.serial_number = i
-            io = PDBIO()
-            io.set_structure(structure)
-            self.io = io
-            self.structure = io.structure
-            self.trajectory = Structure.Structure("MultiModel")
-            start = self.structure[0].copy()
-            start.id = 1
-            start.serial_num = 2
-            self.trajectory.add(start)
-        except KeyError:
-            exit(f"\nERROR! PDB file {self.PDB_file} does not contain any structure or file is corrupted.\n")
-
         # creation of data directories
         self.data_dir.mkdir(parents=True, exist_ok=True)
         (self.data_dir / "input_PDB").mkdir(exist_ok=True)
         (self.data_dir / "optimised_PDB").mkdir(exist_ok=True)
         shutil.copy(self.PDB_file, self.data_dir / "input_PDB")
-        print("ok")
+
+        # open PDB file by Biopython and save it back to repair errors (e.g. wrong serial numbers of atoms)
+        try:
+            structure = PDBParser(QUIET=True).get_structure("structure", self.PDB_file)
+            repaired_PDB_file = str(self.data_dir / "input_PDB" / f"{Path(self.PDB_file).stem}_biopython.pdb")
+            io = PDBIO()
+            io.set_structure(structure)
+            io.save(repaired_PDB_file)
+        except KeyError:
+            exit(f"\nERROR! PDB file {self.PDB_file} does not contain any structure or file is corrupted.\n")
+
+        # load structure
+        structure = PDBParser(QUIET=True).get_structure("structure", repaired_PDB_file)[0]
+        io = PDBIO()
+        io.set_structure(structure)
+        self.io = io
+        self.structure = io.structure
+        self.trajectory = Structure.Structure("MultiModel")
+        start = self.structure[0].copy()
+        start.id = 1
+        start.serial_num = 2
+        self.trajectory.add(start)
 
         # prepared substructures data for optimisation
         self.substructures_data = []
@@ -448,6 +452,8 @@ class Raphan:
                                                              optimised_residue_index=residue_index,
                                                              optimised_atoms=optimised_atoms,
                                                              final_optimised_atoms=set([atom.serial_number for atom in residue])))
+        print("ok")
+
 
 
 def run_constrained_alpha_optimisations(raphan):
