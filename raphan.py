@@ -453,9 +453,9 @@ class Raphan:
                 for atom in residue:
                     optimised_atoms.add(atom.serial_number)
             self.substructures_data.append(Substructure_data(data_dir=substructure_data_dir,
-                                                             residue_id={"chainId": residue.get_parent().id,
-                                                                         "residueId": residue.id[1],
-                                                                         "residueName": residue.resname},
+                                                             residue_id={"chain_id": residue.get_parent().id,
+                                                                         "residue_id": residue.id[1],
+                                                                         "residue_name": residue.resname},
                                                              optimised_residue_index=residue_index,
                                                              optimised_atoms=optimised_atoms,
                                                              final_optimised_atoms=set([atom.serial_number for atom in residue])))
