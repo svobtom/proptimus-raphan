@@ -369,17 +369,17 @@ class Raphan:
             formatted_unconverged_residues = "; ".join(f"{res['chainId']}:{res['residueId']}:{res['residueName']}" for res in self.unconverged_residues_ids)
             print(f"WARNING! OPTIMISATION FOR RESIDUE(S) {formatted_unconverged_residues} DID NOT CONVERGE!")
 
-        print(f"Saving optimised structure to {self.data_dir}/optimised_PDB/{Path(self.PDB_file).stem}_optimised.pdb... ", end="", flush=True)
+        print(f"Saving optimised structure to {self.data_dir}/optimised_PDB/optimised.pdb... ", end="", flush=True)
         for atom in self.structure.get_atoms():
             atom.coord = coordinates[(atom.serial_number - 1) * 3:(atom.serial_number - 1) * 3 + 3]
-        self.io.save(str(self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised.pdb"))
+        self.io.save(str(self.data_dir / "optimised_PDB" / "optimised.pdb"))
         self.io.set_structure(self.trajectory)
         self.io.save(str(self.data_dir / "optimised_PDB" / "trajectory.pdb"))
         print("ok")
 
         if self.delete_auxiliary_files:
             print("Deleting auxiliary files...", end="")
-            final_pdb = self.data_dir / "optimised_PDB" / f"{Path(self.PDB_file).stem}_optimised.pdb"
+            final_pdb = self.data_dir / "optimised_PDB" / "optimised.pdb"
             final_pdb.replace(self.data_dir / final_pdb.name)
             trajectory = self.data_dir / "optimised_PDB" / "trajectory.pdb"
             trajectory.replace(self.data_dir / trajectory.name)
@@ -493,7 +493,7 @@ def run_constrained_alpha_optimisations(raphan):
     (raphan.data_dir / "constrained_alpha_carbons_optimisations" / "raphan").mkdir(parents=True, exist_ok=True)
     with open(raphan.data_dir / "constrained_alpha_carbons_optimisations/raphan/xtb_settings.inp", "w") as xtb_settings_file:
         xtb_settings_file.write(f"$constrain\n    force constant=10.0\n    atoms: {','.join(alpha_carbons_indices)}\n$end")
-    subprocess.run(["xtb", f"../../optimised_PDB/{Path(raphan.PDB_file).stem}_optimised.pdb", "--opt", "--alpb", "water", "--gfnff", "--input", "xtb_settings.inp", "--verbose"],
+    subprocess.run(["xtb", f"../../optimised_PDB/optimised.pdb", "--opt", "--alpb", "water", "--gfnff", "--input", "xtb_settings.inp", "--verbose"],
                    cwd=raphan.data_dir / "constrained_alpha_carbons_optimisations" / "raphan",
                    stdout=open(raphan.data_dir / "constrained_alpha_carbons_optimisations/raphan/xtb_output.txt", "w"),
                    stderr=open(raphan.data_dir / "constrained_alpha_carbons_optimisations/raphan/xtb_error_output.txt", "w"),
@@ -519,7 +519,7 @@ def run_constrained_alpha_optimisations(raphan):
     # compare structure optimised by PROPTIMUS RAPHANgfnff and structure optimised by PROPTIMUS RAPHANgfnff + GFNFFca
     try:
         s1 = PDBParser(QUIET=True).get_structure(id="structure",
-                                                 file=raphan.data_dir / "optimised_PDB" / f"{Path(raphan.PDB_file).stem}_optimised.pdb")
+                                                 file=raphan.data_dir / "optimised_PDB" / "optimised.pdb")
         s2 = PDBParser(QUIET=True).get_structure(id="structure",
                                                  file=raphan.data_dir / "constrained_alpha_carbons_optimisations/raphan/xtbopt.pdb")
         sup = Superimposer()
