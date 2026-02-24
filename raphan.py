@@ -70,10 +70,12 @@ class AtomSelector(Select):
 class Substructure_data:
     def __init__(self,
                  data_dir,
+                 residue_id,
                  optimised_residue_index,
                  optimised_atoms,
                  final_optimised_atoms):
-        self.data_dir = Path(data_dir)
+        self.data_dir = data_dir
+        self.residue_id = residue_id
         self.optimised_residue_index = optimised_residue_index
         self.archive = []
         self.converged = False
@@ -324,8 +326,8 @@ class Raphan:
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None and convergence is None and substructure_data is None:  # xtb did not converge
                         continue
-                    self.substructures_data[substructure_data.optimised_residue_index - 1].archive.append(optimised_coordinates)
-                    self.substructures_data[substructure_data.optimised_residue_index - 1].converged = convergence
+                    self.substructures_data[substructure_data.optimised_residue_index].archive.append(optimised_coordinates)
+                    self.substructures_data[substructure_data.optimised_residue_index].converged = convergence
                 for i, atom in enumerate(self.structure.get_atoms()):
                     atom.coord = coordinates[i*3:i*3+3]
                 step = self.structure[0].copy()
@@ -346,8 +348,8 @@ class Raphan:
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
                     if optimised_coordinates is None and convergence is None and substructure_data is None:  # xtb did not converge
                         continue
-                    self.substructures_data[substructure_data.optimised_residue_index - 1].archive.append(optimised_coordinates)
-                    self.substructures_data[substructure_data.optimised_residue_index - 1].converged = convergence
+                    self.substructures_data[substructure_data.optimised_residue_index].archive.append(optimised_coordinates)
+                    self.substructures_data[substructure_data.optimised_residue_index].converged = convergence
                 for i, atom in enumerate(self.structure.get_atoms()):
                     atom.coord = coordinates[i*3:i*3+3]
                 step = self.structure[0].copy()
@@ -361,10 +363,11 @@ class Raphan:
             bar.close()
             self.iterations = iteration
 
-            # control of unconverged residues
-            unconverged_substructures = [str(substructure_data.optimised_residue_index) for substructure_data in self.substructures_data if not substructure_data.converged]
-            if unconverged_substructures:
-                print(f"WARNING! OPTIMISATION FOR RESIDUE(S) WITH INDICE(S) {', '.join(unconverged_substructures)} DID NOT CONVERGE!")
+        # control of unconverged residues
+        self.unconverged_residues_ids = [substructure_data.residue_id for substructure_data in self.substructures_data if not substructure_data.converged]
+        if self.unconverged_residues_ids:
+            formatted_unconverged_residues = "; ".join(f"{res['chainId']}:{res['residueId']}:{res['residueName']}" for res in self.unconverged_residues_ids)
+            print(f"WARNING! OPTIMISATION FOR RESIDUE(S) {formatted_unconverged_residues} DID NOT CONVERGE!")
 
         print(f"Saving optimised structure to {self.data_dir}/optimised_PDB/{Path(self.PDB_file).stem}_optimised.pdb... ", end="", flush=True)
         for atom in self.structure.get_atoms():
@@ -420,15 +423,16 @@ class Raphan:
         self.substructures_data = []
         kdtree = NeighborSearch(list(self.structure.get_atoms()))
 
-        for residue_index, residue in enumerate(self.structure.get_residues(), start=1):
-            (self.data_dir / f"sub_{residue_index}").mkdir(exist_ok=True)
+        for residue_index, residue in enumerate(self.structure.get_residues()):
+            substructure_data_dir = self.data_dir / f"sub_{residue.get_parent().id}_{residue.id[1]}_{residue.resname}"
+            substructure_data_dir.mkdir(exist_ok=True)
             atoms_in_30A = kdtree.search(center=residue.center_of_mass(geometric=True),
                                          radius=30, # radius of AMK (6A) + outer substructure radius (12A) + maximum shift of atom (10A) + extra (2A)
                                          level="A")
             selector = AtomSelector()
             selector.full_ids = set([atom.full_id for atom in atoms_in_30A])
             selector.res_full_ids = set([atom.get_parent().full_id for atom in atoms_in_30A])
-            self.io.save(file=str(self.data_dir / f"sub_{residue_index}" / "atoms_in_30A.pdb"),
+            self.io.save(file=str(substructure_data_dir / "atoms_in_30A.pdb"),
                          select=selector,
                          preserve_atom_numbering=True)
 
@@ -448,7 +452,10 @@ class Raphan:
             else:  # heteroresidue
                 for atom in residue:
                     optimised_atoms.add(atom.serial_number)
-            self.substructures_data.append(Substructure_data(data_dir=self.data_dir / f"sub_{residue_index}",
+            self.substructures_data.append(Substructure_data(data_dir=substructure_data_dir,
+                                                             residue_id={"chainId": residue.get_parent().id,
+                                                                         "residueId": residue.id[1],
+                                                                         "residueName": residue.resname},
                                                              optimised_residue_index=residue_index,
                                                              optimised_atoms=optimised_atoms,
                                                              final_optimised_atoms=set([atom.serial_number for atom in residue])))
