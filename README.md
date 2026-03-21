@@ -2,9 +2,9 @@
 
 ## Description
 
-PROPTIMUS RAPHAN is a rapid alternative to optimisation with constrained alpha carbons. This approach divides a protein structure into overlapping substructures, allowing each to be optimised independently. As a result, the computation time is linear with respect to the size of the structure. Our approach can achieve results comparable to the overall optimisation of the structure with constrained alpha carbons in significantly less time. PROPTIMUS RAPHAN employs an almost quantum-mechanically accurate force field, [GFN-FF](https://onlinelibrary.wiley.com/doi/10.1002/anie.202004239). This force field is generic, physics-based, and suitable for large molecular systems. The details about the methodology are described on the [wiki](https://github.com/sb-ncbr/proptimus_raphan/wiki).
+PROPTIMUS RAPHAN is a rapid alternative to constrained alpha-carbon optimisation. This approach divides a protein structure into overlapping substructures, allowing each to be optimised independently. As a result, the computation time is linear with respect to the size of the structure. Our approach can achieve results comparable to overall structure optimisation with constrained alpha carbons in significantly less time. PROPTIMUS RAPHAN employs an almost quantum-mechanically accurate force field, [GFN-FF](https://onlinelibrary.wiley.com/doi/10.1002/anie.202004239). This force field is generic, physics-based, and suitable for large molecular systems. Methodological details are described in the [article](https://www.biorxiv.org/content/10.1101/2025.11.24.690085v2.full).
 
-## Getting Started
+## Installation
 
 **1. Download and run the [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) installer**
 
