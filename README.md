@@ -2,9 +2,9 @@
 
 ## Description
 
-PROPTIMUS RAPHAN is a rapid alternative to optimisation with constrained alpha carbons. This approach divides a protein structure into overlapping substructures, allowing each to be optimised independently. As a result, the computation time is linear with respect to the size of the structure. Our approach can achieve results comparable to the overall optimisation of the structure with constrained alpha carbons in significantly less time. PROPTIMUS RAPHAN employs an almost quantum-mechanically accurate force field, [GFN-FF](https://onlinelibrary.wiley.com/doi/10.1002/anie.202004239). This force field is generic, physics-based, and suitable for large molecular systems. The details about the methodology are described on the [wiki](https://github.com/sb-ncbr/proptimus_raphan/wiki).
+PROPTIMUS RAPHAN is a rapid alternative to constrained alpha-carbon optimisation. This approach divides a protein structure into overlapping substructures, allowing each to be optimised independently. As a result, the computation time is linear with respect to the size of the structure. Our approach can achieve results comparable to overall structure optimisation with constrained alpha carbons in significantly less time. PROPTIMUS RAPHAN employs an almost quantum-mechanically accurate force field, [GFN-FF](https://onlinelibrary.wiley.com/doi/10.1002/anie.202004239). This force field is generic, physics-based, and suitable for large molecular systems. Methodological details are described in the [article](https://www.biorxiv.org/content/10.1101/2025.11.24.690085v2.full).
 
-## Getting Started
+## Installation
 
 **1. Download and run the [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) installer**
 
@@ -19,7 +19,7 @@ bash Miniconda3-latest-Linux-x86_64.sh
 git clone https://github.com/sb-ncbr/proptimus_raphan
 ```
 
-**3. Set up virtual environment**
+**3. Set up a virtual environment**
 
 * Create a virtual environment named `proptimus-raphan`:
 
@@ -62,6 +62,7 @@ diff examples/P0DL07_optimised.pdb P0DL07_test/optimised_PDB/P0DL07_optimised.pd
 Please note that the resulting structures may vary slightly. This is due to numerical instabilities caused by running on different hardware.
 
 ## Running the calculation in the Docker container
+
 ```bash
 # Build Docker container
 docker build -t local/proptimus .
@@ -76,6 +77,10 @@ docker run --rm --name proptimus \
   local/proptimus \
   python raphan.py --PDB_file examples/P0DL07.pdb --data_dir results/P0DL07
 ```
+
+## Reproduction of test results from the publication about PROPTIMUS RAPHAN
+
+The comparison_scripts directory contains several Python scripts for reproducing the results from the publication. To run the scripts, you need to download and unzip the calculation.zip file from [supplementary files](https://onedata.e-infra.cz/ozw/onezone/i#/public/shares/baa17140ec395e18bd97e089d1c7b683ch7f7a).
 
 ## License
 
